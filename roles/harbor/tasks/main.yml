@@ -1,0 +1,57 @@
+---
+- name: Download Harbor installer {{ harbor_version }}
+  ansible.builtin.get_url:
+    url: https://github.com/goharbor/harbor/releases/download/{{ harbor_version }}/harbor-offline-installer-{{ harbor_version }}.tgz
+    dest: /tmp/harbor-offline-installer-{{ harbor_version }}.tgz
+    mode: "0644"
+
+- name: Create {{ harbor_install_dir }} directory if it doesn't exist
+  ansible.builtin.file:
+    path: {{ harbor_install_dir }}
+    state: directory
+    mode: "0755"
+
+- name: Extract Harbor installer
+  ansible.builtin.unarchive:
+    src: /tmp/harbor-offline-installer-{{ harbor_version }}.tgz
+    dest: {{ harbor_install_dir }}
+    remote_src: true
+
+- name: Check if docker-compose.yml exists
+  ansible.builtin.stat:
+    path: {{ harbor_install_dir }}/harbor/docker-compose.yml
+  register: docker_compose_file
+
+- name: Create harbor.yml configuration file
+  ansible.builtin.template:
+    src: harbor.yml.j2
+    dest: {{ harbor_install_dir }}/harbor/harbor.yml
+    mode: "0644"
+
+- name: Install Harbor
+  ansible.builtin.shell:
+    cmd: ./install.sh
+    chdir: {{ harbor_install_dir }}/harbor
+    creates: {{ harbor_install_dir }}/harbor/docker-compose.yml
+    executable: /bin/bash
+  when: not docker_compose_file.stat.exists
+
+- name: Stop Harbor
+  community.docker.docker_compose_v2:
+    project_src: {{ harbor_install_dir }}/harbor
+    state: absent
+  when: docker_compose_file.stat.exists
+
+- name: Run prepare
+  ansible.builtin.shell:
+    cmd: ./prepare
+    chdir: {{ harbor_install_dir }}/harbor
+    creates: {{ harbor_install_dir }}/harbor/docker-compose.yml
+    executable: /bin/bash
+  when: docker_compose_file.stat.exists
+
+- name: Start Harbor
+  community.docker.docker_compose_v2:
+    project_src: {{ harbor_install_dir }}/harbor
+    state: present
+
