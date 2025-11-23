@@ -1,0 +1,5 @@
+---
+- name: Harbor
+  roles:
+    - docker
+    - harbor
