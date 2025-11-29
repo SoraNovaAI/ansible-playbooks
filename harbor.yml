@@ -1,5 +1,7 @@
 ---
 - name: Harbor
+  hosts: localhost
+  become: true
   roles:
     - docker
     - harbor
